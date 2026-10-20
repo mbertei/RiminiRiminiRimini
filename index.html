@@ -25,10 +25,7 @@
         <p class="text-slate-400 text-sm mt-1">Tratte Dirette: Rimini ↔ Bologna C.le (Frecciarossa & Italo)</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <button onclick="triggerGitHubWorkflow()" class="bg-amber-600 hover:bg-amber-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2 shadow-lg">
-          <i class="fa-solid fa-rotate"></i> Aggiorna Dati Ora
-        </button>
-        <label for="date-select" class="text-xs text-slate-400 ml-2">Data:</label>
+        <label for="date-select" class="text-xs text-slate-400">Data Rilevazione:</label>
         <input type="date" id="date-select" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500">
       </div>
     </div>
@@ -78,7 +75,7 @@
         <div>
           <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Indice Puntualità</p>
           <h2 id="kpi-punctuality" class="text-3xl font-bold mt-1 text-emerald-400">--%</h2>
-          <p class="text-xs text-slate-400 mt-2">Treni con ritardo ≤ 5 min</p>
+          <p class="text-xs text-slate-400 mt-2">Treni con ritardo medio ≤ 5 min</p>
         </div>
         <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
           <i class="fa-solid fa-circle-check"></i>
@@ -109,7 +106,7 @@
       </div>
     </div>
 
-    <!-- TABELLA TRENI -->
+    <!-- TABELLA DETTAGLIATA TRENI -->
     <div class="glass-card p-6 rounded-2xl overflow-hidden">
       <h3 class="text-base font-semibold text-white mb-4 flex items-center justify-between">
         <span><i class="fa-solid fa-list text-amber-400 mr-2"></i>Dettaglio Rilevazioni Corse</span>
@@ -122,9 +119,11 @@
               <th class="p-3">Operatore</th>
               <th class="p-3">N. Treno</th>
               <th class="p-3">Tratta</th>
-              <th class="p-3">Sched.</th>
-              <th class="p-3">Effettivo</th>
-              <th class="p-3">Ritardo</th>
+              <th class="p-3">Partenza (Sched / Eff)</th>
+              <th class="p-3 text-center">Ritardo Part.</th>
+              <th class="p-3">Arrivo (Sched / Eff)</th>
+              <th class="p-3 text-center">Ritardo Arr.</th>
+              <th class="p-3 text-center">Ritardo Medio</th>
               <th class="p-3">Stato</th>
             </tr>
           </thead>
@@ -154,38 +153,6 @@
         dbData = getFallbackData();
       }
       initApp();
-    }
-
-    async function triggerGitHubWorkflow() {
-      const token = prompt("Inserisci il tuo GitHub Personal Access Token (conpermessi 'repo' o 'workflow') per avviare l'aggiornamento live:");
-      if (!token) return;
-
-      // Sostituisci con il nome utente e repository corretti su GitHub
-      const owner = "mbertei";
-      const repo = "RiminiRiminiRimini";
-
-      alert("Invio richiesta di aggiornamento a GitHub... L'operazione richiederà circa 30 secondi prima che i dati siano visibili ricaricando la pagina.");
-
-      try {
-        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/tracker.yml/dispatches`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ref: 'main' })
-        });
-
-        if (response.ok) {
-          alert("Aggiornamento avviato con successo su GitHub! Attendi 30 secondi e ricarica la pagina.");
-        } else {
-          const errText = await response.text();
-          alert("Errore nell'avvio dell'azione: " + response.status + " - " + errText);
-        }
-      } catch (e) {
-        alert("Errore di rete durante la chiamata API: " + e.message);
-      }
     }
 
     function initApp() {
@@ -234,7 +201,7 @@
       const currentVal = trainSelect.value;
       trainSelect.innerHTML = '<option value="ALL">-- Tutti i Treni --</option>';
 
-      const uniqueTrains = Array.from(new Set(trains.map(t => `${t.train_no}|${t.time_sched}`)));
+      const uniqueTrains = Array.from(new Set(trains.map(t => `${t.train_no}|${t.dep_sched || t.time_sched}`)));
       uniqueTrains.sort().forEach(item => {
         const [no, time] = item.split('|');
         trainSelect.innerHTML += `<option value="${no}">${no} (${time})</option>`;
@@ -255,17 +222,17 @@
         document.getElementById('kpi-max-delay').textContent = '-- min';
         document.getElementById('kpi-worst-train').textContent = 'Nessun dato';
       } else {
-        const delays = trains.map(t => t.delay);
+        const delays = trains.map(t => t.avg_delay !== undefined ? t.avg_delay : t.delay);
         const avgDelay = (delays.reduce((a, b) => a + b, 0) / delays.length).toFixed(1);
-        const onTime = trains.filter(t => t.delay <= 5).length;
+        const onTime = trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 5).length;
         const punctuality = Math.round((onTime / trains.length) * 100);
         const maxDelay = Math.max(...delays);
-        const worstTrain = trains.find(t => t.delay === maxDelay);
+        const worstTrain = trains.find(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) === maxDelay);
 
         const frTrains = trains.filter(t => t.operator === 'Frecciarossa');
         const italoTrains = trains.filter(t => t.operator === 'Italo');
-        const frAvg = frTrains.length ? (frTrains.reduce((a,b)=>a+b.delay,0)/frTrains.length).toFixed(1) : '--';
-        const itAvg = italoTrains.length ? (italoTrains.reduce((a,b)=>a+b.delay,0)/italoTrains.length).toFixed(1) : '--';
+        const frAvg = frTrains.length ? (frTrains.reduce((a,b)=>a+(b.avg_delay!==undefined?b.avg_delay:b.delay),0)/frTrains.length).toFixed(1) : '--';
+        const itAvg = italoTrains.length ? (italoTrains.reduce((a,b)=>a+(b.avg_delay!==undefined?b.avg_delay:b.delay),0)/italoTrains.length).toFixed(1) : '--';
 
         document.getElementById('kpi-avg-delay').textContent = `${avgDelay} min`;
         document.getElementById('kpi-operator-split').textContent = `FR: ${frAvg}m | Italo: ${itAvg}m`;
@@ -283,8 +250,18 @@
       tbody.innerHTML = '';
 
       trains.forEach(t => {
-        const badgeColor = t.delay <= 5 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                           t.delay <= 15 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+        const depSched = t.dep_sched || t.time_sched || '--:--';
+        const depActual = t.dep_actual || t.time_actual || '--:--';
+        const depDelay = t.dep_delay !== undefined ? t.dep_delay : t.delay;
+
+        const arrSched = t.arr_sched || '--:--';
+        const arrActual = t.arr_actual || '--:--';
+        const arrDelay = t.arr_delay !== undefined ? t.arr_delay : t.delay;
+
+        const avgDelay = t.avg_delay !== undefined ? t.avg_delay : t.delay;
+
+        const badgeColor = avgDelay <= 5 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                           avgDelay <= 15 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                            'bg-rose-500/10 text-rose-400 border-rose-500/20';
 
         const opBadge = t.operator === 'Frecciarossa' ? 'bg-red-600/20 text-red-400 border-red-500/30' : 'bg-rose-900/30 text-rose-300 border-rose-700/30';
@@ -294,10 +271,12 @@
             <td class="p-3"><span class="px-2 py-0.5 text-xs rounded border ${opBadge}">${t.operator}</span></td>
             <td class="p-3 font-semibold text-white">${t.train_no}</td>
             <td class="p-3 text-slate-300">${t.route === 'RN-BO' ? 'Rimini → Bologna' : 'Bologna → Rimini'}</td>
-            <td class="p-3 text-slate-400">${t.time_sched}</td>
-            <td class="p-3 text-slate-200">${t.time_actual}</td>
-            <td class="p-3 font-bold ${t.delay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${t.delay} min</td>
-            <td class="p-3"><span class="px-2.5 py-1 text-xs rounded-full border ${badgeColor}">${t.delay <= 5 ? 'In orario' : 'In ritardo'}</span></td>
+            <td class="p-3 text-slate-300">${depSched} <span class="text-slate-500">→</span> <span class="text-white font-medium">${depActual}</span></td>
+            <td class="p-3 text-center font-semibold ${depDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${depDelay} m</td>
+            <td class="p-3 text-slate-300">${arrSched} <span class="text-slate-500">→</span> <span class="text-white font-medium">${arrActual}</span></td>
+            <td class="p-3 text-center font-semibold ${arrDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${arrDelay} m</td>
+            <td class="p-3 text-center font-bold ${avgDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${avgDelay} m</td>
+            <td class="p-3"><span class="px-2.5 py-1 text-xs rounded-full border ${badgeColor}">${avgDelay <= 5 ? 'In orario' : 'In ritardo'}</span></td>
           </tr>
         `;
       });
@@ -305,9 +284,9 @@
 
     function renderCharts(trains) {
       const statusCounts = [
-        trains.filter(t => t.delay <= 5).length,
-        trains.filter(t => t.delay > 5 && t.delay <= 15).length,
-        trains.filter(t => t.delay > 15).length
+        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 5).length,
+        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) > 5 && (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 15).length,
+        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) > 15).length
       ];
 
       if (statusChart) statusChart.destroy();
@@ -331,7 +310,7 @@
         let dayTrains = dbData[d] || [];
         if (trainFilter !== 'ALL') dayTrains = dayTrains.filter(t => t.train_no === trainFilter);
         if (dayTrains.length === 0) return 0;
-        return (dayTrains.reduce((a, b) => a + b.delay, 0) / dayTrains.length).toFixed(1);
+        return (dayTrains.reduce((a, b) => a + (b.avg_delay !== undefined ? b.avg_delay : b.delay), 0) / dayTrains.length).toFixed(1);
       });
 
       if (trendChart) trendChart.destroy();
@@ -365,11 +344,11 @@
       const today = new Date().toISOString().split('T')[0];
       return {
         [today]: [
-          { operator: 'Frecciarossa', train_no: 'FR9802', route: 'RN-BO', time_sched: '06:15', time_actual: '06:18', delay: 3 },
-          { operator: 'Italo', train_no: 'IT8902', route: 'RN-BO', time_sched: '06:38', time_actual: '06:50', delay: 12 },
-          { operator: 'Frecciarossa', train_no: 'FR8810', route: 'RN-BO', time_sched: '07:20', time_actual: '07:45', delay: 25 },
-          { operator: 'Frecciarossa', train_no: 'FR9806', route: 'BO-RN', time_sched: '16:35', time_actual: '16:37', delay: 2 },
-          { operator: 'Italo', train_no: 'IT8920', route: 'BO-RN', time_sched: '18:15', time_actual: '18:30', delay: 15 }
+          { operator: 'Frecciarossa', train_no: 'FR9802', route: 'RN-BO', dep_sched: '06:15', dep_actual: '06:18', dep_delay: 3, arr_sched: '07:10', arr_actual: '07:15', arr_delay: 5, avg_delay: 4 },
+          { operator: 'Italo', train_no: 'IT8902', route: 'RN-BO', dep_sched: '06:38', dep_actual: '06:50', dep_delay: 12, arr_sched: '07:33', arr_actual: '07:47', arr_delay: 14, avg_delay: 13 },
+          { operator: 'Frecciarossa', train_no: 'FR8810', route: 'RN-BO', dep_sched: '07:20', dep_actual: '07:45', dep_delay: 25, arr_sched: '08:15', arr_actual: '08:43', arr_delay: 28, avg_delay: 26.5 },
+          { operator: 'Frecciarossa', train_no: 'FR9806', route: 'BO-RN', dep_sched: '16:35', dep_actual: '16:37', dep_delay: 2, arr_sched: '17:30', arr_actual: '17:31', arr_delay: 1, avg_delay: 1.5 },
+          { operator: 'Italo', train_no: 'IT8920', route: 'BO-RN', dep_sched: '18:15', dep_actual: '18:30', dep_delay: 15, arr_sched: '19:10', arr_actual: '19:28', arr_delay: 18, avg_delay: 16.5 }
         ]
       };
     }
