@@ -2,8 +2,9 @@ name: Daily Train Delay Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Esegue automaticamente ogni ora (minuto 0 di ogni ora)
-  workflow_dispatch:        # Permette l'avvio manuale in qualsiasi momento dalla tab Actions
+    - cron: '*/10 4-7 * * *'   # Ogni 10 minuti nella fascia mattutina
+    - cron: '*/10 14-19 * * *' # Ogni 10 minuti nella fascia pomeridiana/serale
+  workflow_dispatch:          # Permette sempre l'avvio manuale dalla tab Actions
 
 jobs:
   update-data:
@@ -28,4 +29,4 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add history.json
-          git diff --staged --quiet || (git commit -m "Update train data hourly [skip ci]" && git push)
+          git diff --staged --quiet || (git commit -m "Update train data [skip ci]" && git push)
