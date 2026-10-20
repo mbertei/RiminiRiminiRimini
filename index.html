@@ -1,359 +1,304 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrainDelay Lab - Rimini ↔ Bologna</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rimini ↔ Bologna High-Speed Train Tracker</title>
+    <!-- Tailwind CSS per un design pulito -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js per i grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="p-4 md:p-8 min-h-screen">
-  <div class="max-w-7xl mx-auto space-y-6">
-    
-    <!-- HEADER -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center glass-card p-6 rounded-2xl gap-4">
-      <div>
-        <h1 class="text-2xl font-bold flex items-center gap-3 text-white">
-          <i class="fa-solid fa-train text-amber-500"></i> TrainDelay Lab
-          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-normal">Live Tracking</span>
-        </h1>
-        <p class="text-slate-400 text-sm mt-1">Tratte Dirette: Rimini ↔ Bologna C.le (Frecciarossa & Italo)</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <label for="date-select" class="text-xs text-slate-400">Data Rilevazione:</label>
-        <input type="date" id="date-select" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500">
-      </div>
+<body class="bg-gray-50 text-gray-900 font-sans">
+
+    <div class="max-w-7xl mx-auto p-4 sm:p-6">
+        <!-- Intestazione -->
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-blue-600">🚄 Rimini ↔ Bologna Tracker</h1>
+                <p class="text-sm text-gray-500 mt-1">Monitoraggio automatico treni Alta Velocità (Frecciarossa & Italo)</p>
+            </div>
+            <!-- Tab Navigation Buttons -->
+            <div class="flex bg-gray-200 p-1 rounded-lg space-x-1">
+                <button onclick="switchTab('overview')" id="btn-overview" class="px-4 py-2 text-sm font-semibold rounded-md bg-white text-blue-600 shadow-sm transition">Panoramica & Grafici</button>
+                <button onclick="switchTab('daily')" id="btn-daily" class="px-4 py-2 text-sm font-semibold rounded-md text-gray-600 hover:text-gray-900 transition">Giorno Corrente</button>
+                <button onclick="switchTab('period')" id="btn-period" class="px-4 py-2 text-sm font-semibold rounded-md text-gray-600 hover:text-gray-900 transition">Filtro per Periodo</button>
+            </div>
+        </header>
+
+        <!-- CONTENUTO TAB 1: PANORAMICA & GRAFICI -->
+        <div id="tab-overview" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Totale Corse Monitorate</h3>
+                    <p id="stat-total-trains" class="text-3xl font-bold text-gray-800 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Ritardo Medio Partenza</h3>
+                    <p id="stat-avg-dep" class="text-3xl font-bold text-blue-600 mt-2">0 min</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Ritardo Medio Arrivo</h3>
+                    <p id="stat-avg-arr" class="text-3xl font-bold text-orange-600 mt-2">0 min</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-bold mb-4 text-gray-700">Andamento Ritardi Medi per Giorno</h3>
+                    <canvas id="delayChart" class="w-full h-64"></canvas>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-4 text-gray-700">Ripartizione per Operatore</h3>
+                    <canvas id="operatorChart" class="w-full h-64"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENUTO TAB 2: GIORNO CORRENTE & FILTRO GIORNO -->
+        <div id="tab-daily" class="hidden space-y-6">
+            <div class="bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Dettaglio Giornaliero</h2>
+                    <p class="text-xs text-gray-500">Seleziona una data per visualizzare le corse e i ritardi registrati.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label for="datePicker" class="text-sm font-medium text-gray-600">Data:</label>
+                    <input type="date" id="datePicker" onchange="renderDailyData()" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider">
+                                <th class="p-3">Operatore</th>
+                                <th class="p-3">Treno</th>
+                                <th class="p-3">Tratta</th>
+                                <th class="p-3">Partenza (Sched. / Eff.)</th>
+                                <th class="p-3">Ritardo Partenza</th>
+                                <th class="p-3">Arrivo (Sched. / Eff.)</th>
+                                <th class="p-3">Ritardo Arrivo</th>
+                                <th class="p-3">Media Ritardo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="daily-table-body" class="divide-y divide-gray-200 text-sm">
+                            <!-- Popolato dinamicamente da JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENUTO TAB 3: FILTRO PER PERIODO -->
+        <div id="tab-period" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Analisi per Intervallo di Date</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Data Inizio</label>
+                        <input type="date" id="startDate" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Data Fine</label>
+                        <input type="date" id="endDate" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <button onclick="calculatePeriodStats()" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Filtra e Analizza</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risultati Periodo -->
+            <div id="period-results" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Corse nel Periodo</h3>
+                    <p id="period-total" class="text-3xl font-bold text-gray-800 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Ritardo Medio Partenza</h3>
+                    <p id="period-dep" class="text-3xl font-bold text-blue-600 mt-2">0 min</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-medium text-gray-500">Ritardo Medio Arrivo</h3>
+                    <p id="period-arr" class="text-3xl font-bold text-orange-600 mt-2">0 min</p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- FILTRI TRATTA, OPERATORE & TRENO -->
-    <div class="glass-card p-4 rounded-xl flex flex-wrap items-center gap-4 text-sm">
-      <div class="flex items-center gap-2">
-        <span class="text-slate-400 font-medium">Tratta:</span>
-        <select id="filter-route" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5">
-          <option value="ALL">Tutte le Tratte</option>
-          <option value="RN-BO">Mattina: Rimini → Bologna (06:00 - 09:00)</option>
-          <option value="BO-RN">Sera: Bologna → Rimini (16:00 - 21:00)</option>
-        </select>
-      </div>
+    <!-- Script di gestione dati e logica UI -->
+    <script>
+        let globalData = {};
+        let delayChartInstance = null;
+        let operatorChartInstance = null;
 
-      <div class="flex items-center gap-2">
-        <span class="text-slate-400 font-medium">Operatore:</span>
-        <select id="filter-operator" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5">
-          <option value="ALL">Tutti</option>
-          <option value="Frecciarossa">Frecciarossa</option>
-          <option value="Italo">Italo</option>
-        </select>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-amber-400 font-medium"><i class="fa-solid fa-filter"></i> Singolo Treno:</span>
-        <select id="filter-train" class="bg-slate-800 border border-amber-500/50 text-amber-200 rounded-lg px-3 py-1.5 font-semibold">
-          <option value="ALL">-- Tutti i Treni --</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- COCKPIT KPI -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-amber-500">
-        <div>
-          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Ritardo Medio Oggi</p>
-          <h2 id="kpi-avg-delay" class="text-3xl font-bold mt-1 text-white">-- min</h2>
-          <p id="kpi-operator-split" class="text-xs text-slate-400 mt-2">FR: -- | Italo: --</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-xl">
-          <i class="fa-solid fa-clock"></i>
-        </div>
-      </div>
-
-      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-emerald-500">
-        <div>
-          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Indice Puntualità</p>
-          <h2 id="kpi-punctuality" class="text-3xl font-bold mt-1 text-emerald-400">--%</h2>
-          <p class="text-xs text-slate-400 mt-2">Treni con ritardo medio ≤ 5 min</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
-          <i class="fa-solid fa-circle-check"></i>
-        </div>
-      </div>
-
-      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-rose-500">
-        <div>
-          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Peggiore Ritardo Oggi</p>
-          <h2 id="kpi-max-delay" class="text-3xl font-bold mt-1 text-rose-400">-- min</h2>
-          <p id="kpi-worst-train" class="text-xs text-slate-400 mt-2">Treno: --</p>
-        </div>
-        <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-xl">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- GRAFICI -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="glass-card p-6 rounded-2xl">
-        <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-chart-pie text-amber-400 mr-2"></i>Distribuzione Puntualità</h3>
-        <div class="h-64"><canvas id="chart-status"></canvas></div>
-      </div>
-      <div class="glass-card p-6 rounded-2xl">
-        <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-chart-line text-amber-400 mr-2"></i>Trend Storico Ritardo Medio</h3>
-        <div class="h-64"><canvas id="chart-trend"></canvas></div>
-      </div>
-    </div>
-
-    <!-- TABELLA DETTAGLIATA TRENI -->
-    <div class="glass-card p-6 rounded-2xl overflow-hidden">
-      <h3 class="text-base font-semibold text-white mb-4 flex items-center justify-between">
-        <span><i class="fa-solid fa-list text-amber-400 mr-2"></i>Dettaglio Rilevazioni Corse</span>
-        <span id="train-count" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">0 Treni</span>
-      </h3>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="border-b border-slate-700 text-xs uppercase text-slate-400 font-semibold bg-slate-800/40">
-              <th class="p-3">Operatore</th>
-              <th class="p-3">N. Treno</th>
-              <th class="p-3">Tratta</th>
-              <th class="p-3">Partenza (Sched / Eff)</th>
-              <th class="p-3 text-center">Ritardo Part.</th>
-              <th class="p-3">Arrivo (Sched / Eff)</th>
-              <th class="p-3 text-center">Ritardo Arr.</th>
-              <th class="p-3 text-center">Ritardo Medio</th>
-              <th class="p-3">Stato</th>
-            </tr>
-          </thead>
-          <tbody id="train-table-body" class="divide-y divide-slate-800 text-sm">
-            <!-- Popolato via JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-
-  <script>
-    let dbData = {};
-    let statusChart = null;
-    let trendChart = null;
-
-    async function loadData() {
-      try {
-        const res = await fetch('history.json?t=' + Date.now());
-        if (res.ok) {
-          dbData = await res.json();
-        } else {
-          dbData = getFallbackData();
+        // Gestione Tab Switch
+        function switchTab(tabName) {
+            ['overview', 'daily', 'period'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`btn-${t}`).classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
+                document.getElementById(`btn-${t}`).classList.add('text-gray-600');
+            });
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            document.getElementById(`btn-${tabName}`).classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+            document.getElementById(`btn-${tabName}`).classList.remove('text-gray-600');
         }
-      } catch (e) {
-        dbData = getFallbackData();
-      }
-      initApp();
-    }
 
-    function initApp() {
-      const dates = Object.keys(dbData).sort().reverse();
-      const dateSelect = document.getElementById('date-select');
-      dateSelect.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
-      
-      if (dates.length > 0) {
-        dateSelect.value = dates[0];
-      }
+        // Caricamento dati da history.json
+        async function loadData() {
+            try {
+                const response = await fetch('history.json?' + new Date().getTime());
+                if (response.ok) {
+                    globalData = await response.json();
+                }
+            } catch (e) {
+                console.error("Errore caricamento storico:", e);
+                globalData = {};
+            }
 
-      populateTrainDropdown();
-      updateDashboard();
+            // Imposta date di default nei picker
+            const today = new Date().toISOString().split('T')[0];
+            const datePicker = document.getElementById('datePicker');
+            if (!datePicker.value) datePicker.value = today;
 
-      document.getElementById('date-select').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
-      document.getElementById('filter-route').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
-      document.getElementById('filter-operator').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
-      document.getElementById('filter-train').addEventListener('change', updateDashboard);
-    }
-
-    function getSelectedDateTrains() {
-      const selectedDate = document.getElementById('date-select').value;
-      const routeFilter = document.getElementById('filter-route').value;
-      const opFilter = document.getElementById('filter-operator').value;
-      const trainFilter = document.getElementById('filter-train').value;
-
-      let trains = dbData[selectedDate] || [];
-
-      if (routeFilter !== 'ALL') trains = trains.filter(t => t.route === routeFilter);
-      if (opFilter !== 'ALL') trains = trains.filter(t => t.operator === opFilter);
-      if (trainFilter !== 'ALL') trains = trains.filter(t => t.train_no === trainFilter);
-
-      return trains;
-    }
-
-    function populateTrainDropdown() {
-      const selectedDate = document.getElementById('date-select').value;
-      const routeFilter = document.getElementById('filter-route').value;
-      const opFilter = document.getElementById('filter-operator').value;
-      const trainSelect = document.getElementById('filter-train');
-
-      let trains = dbData[selectedDate] || [];
-      if (routeFilter !== 'ALL') trains = trains.filter(t => t.route === routeFilter);
-      if (opFilter !== 'ALL') trains = trains.filter(t => t.operator === opFilter);
-
-      const currentVal = trainSelect.value;
-      trainSelect.innerHTML = '<option value="ALL">-- Tutti i Treni --</option>';
-
-      const uniqueTrains = Array.from(new Set(trains.map(t => `${t.train_no}|${t.dep_sched || t.time_sched}`)));
-      uniqueTrains.sort().forEach(item => {
-        const [no, time] = item.split('|');
-        trainSelect.innerHTML += `<option value="${no}">${no} (${time})</option>`;
-      });
-
-      if (uniqueTrains.some(item => item.startsWith(currentVal))) {
-        trainSelect.value = currentVal;
-      }
-    }
-
-    function updateDashboard() {
-      const trains = getSelectedDateTrains();
-      document.getElementById('train-count').textContent = `${trains.length} Treni`;
-
-      if (trains.length === 0) {
-        document.getElementById('kpi-avg-delay').textContent = '-- min';
-        document.getElementById('kpi-punctuality').textContent = '--%';
-        document.getElementById('kpi-max-delay').textContent = '-- min';
-        document.getElementById('kpi-worst-train').textContent = 'Nessun dato';
-      } else {
-        const delays = trains.map(t => t.avg_delay !== undefined ? t.avg_delay : t.delay);
-        const avgDelay = (delays.reduce((a, b) => a + b, 0) / delays.length).toFixed(1);
-        const onTime = trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 5).length;
-        const punctuality = Math.round((onTime / trains.length) * 100);
-        const maxDelay = Math.max(...delays);
-        const worstTrain = trains.find(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) === maxDelay);
-
-        const frTrains = trains.filter(t => t.operator === 'Frecciarossa');
-        const italoTrains = trains.filter(t => t.operator === 'Italo');
-        const frAvg = frTrains.length ? (frTrains.reduce((a,b)=>a+(b.avg_delay!==undefined?b.avg_delay:b.delay),0)/frTrains.length).toFixed(1) : '--';
-        const itAvg = italoTrains.length ? (italoTrains.reduce((a,b)=>a+(b.avg_delay!==undefined?b.avg_delay:b.delay),0)/italoTrains.length).toFixed(1) : '--';
-
-        document.getElementById('kpi-avg-delay').textContent = `${avgDelay} min`;
-        document.getElementById('kpi-operator-split').textContent = `FR: ${frAvg}m | Italo: ${itAvg}m`;
-        document.getElementById('kpi-punctuality').textContent = `${punctuality}%`;
-        document.getElementById('kpi-max-delay').textContent = `+${maxDelay} min`;
-        document.getElementById('kpi-worst-train').textContent = worstTrain ? `${worstTrain.train_no} (${worstTrain.route})` : '--';
-      }
-
-      renderTable(trains);
-      renderCharts(trains);
-    }
-
-    function renderTable(trains) {
-      const tbody = document.getElementById('train-table-body');
-      tbody.innerHTML = '';
-
-      trains.forEach(t => {
-        const depSched = t.dep_sched || t.time_sched || '--:--';
-        const depActual = t.dep_actual || t.time_actual || '--:--';
-        const depDelay = t.dep_delay !== undefined ? t.dep_delay : t.delay;
-
-        const arrSched = t.arr_sched || '--:--';
-        const arrActual = t.arr_actual || '--:--';
-        const arrDelay = t.arr_delay !== undefined ? t.arr_delay : t.delay;
-
-        const avgDelay = t.avg_delay !== undefined ? t.avg_delay : t.delay;
-
-        const badgeColor = avgDelay <= 5 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                           avgDelay <= 15 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                           'bg-rose-500/10 text-rose-400 border-rose-500/20';
-
-        const opBadge = t.operator === 'Frecciarossa' ? 'bg-red-600/20 text-red-400 border-red-500/30' : 'bg-rose-900/30 text-rose-300 border-rose-700/30';
-
-        tbody.innerHTML += `
-          <tr class="hover:bg-slate-800/50 transition">
-            <td class="p-3"><span class="px-2 py-0.5 text-xs rounded border ${opBadge}">${t.operator}</span></td>
-            <td class="p-3 font-semibold text-white">${t.train_no}</td>
-            <td class="p-3 text-slate-300">${t.route === 'RN-BO' ? 'Rimini → Bologna' : 'Bologna → Rimini'}</td>
-            <td class="p-3 text-slate-300">${depSched} <span class="text-slate-500">→</span> <span class="text-white font-medium">${depActual}</span></td>
-            <td class="p-3 text-center font-semibold ${depDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${depDelay} m</td>
-            <td class="p-3 text-slate-300">${arrSched} <span class="text-slate-500">→</span> <span class="text-white font-medium">${arrActual}</span></td>
-            <td class="p-3 text-center font-semibold ${arrDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${arrDelay} m</td>
-            <td class="p-3 text-center font-bold ${avgDelay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${avgDelay} m</td>
-            <td class="p-3"><span class="px-2.5 py-1 text-xs rounded-full border ${badgeColor}">${avgDelay <= 5 ? 'In orario' : 'In ritardo'}</span></td>
-          </tr>
-        `;
-      });
-    }
-
-    function renderCharts(trains) {
-      const statusCounts = [
-        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 5).length,
-        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) > 5 && (t.avg_delay !== undefined ? t.avg_delay : t.delay) <= 15).length,
-        trains.filter(t => (t.avg_delay !== undefined ? t.avg_delay : t.delay) > 15).length
-      ];
-
-      if (statusChart) statusChart.destroy();
-      const ctxStatus = document.getElementById('chart-status').getContext('2d');
-      statusChart = new Chart(ctxStatus, {
-        type: 'doughnut',
-        data: {
-          labels: ['In Orario (≤5m)', 'Ritardo Lieve (6-15m)', 'Ritardo Forte (>15m)'],
-          datasets: [{
-            data: statusCounts,
-            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
-            borderWidth: 0
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
-      });
-
-      const dates = Object.keys(dbData).sort();
-      const trainFilter = document.getElementById('filter-train').value;
-      const trendData = dates.map(d => {
-        let dayTrains = dbData[d] || [];
-        if (trainFilter !== 'ALL') dayTrains = dayTrains.filter(t => t.train_no === trainFilter);
-        if (dayTrains.length === 0) return 0;
-        return (dayTrains.reduce((a, b) => a + (b.avg_delay !== undefined ? b.avg_delay : b.delay), 0) / dayTrains.length).toFixed(1);
-      });
-
-      if (trendChart) trendChart.destroy();
-      const ctxTrend = document.getElementById('chart-trend').getContext('2d');
-      trendChart = new Chart(ctxTrend, {
-        type: 'line',
-        data: {
-          labels: dates,
-          datasets: [{
-            label: 'Ritardo Medio (min)',
-            data: trendData,
-            borderColor: '#f59e0b',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-          },
-          plugins: { legend: { labels: { color: '#94a3b8' } } }
+            initOverview();
+            renderDailyData();
         }
-      });
-    }
 
-    function getFallbackData() {
-      const today = new Date().toISOString().split('T')[0];
-      return {
-        [today]: [
-          { operator: 'Frecciarossa', train_no: 'FR9802', route: 'RN-BO', dep_sched: '06:15', dep_actual: '06:18', dep_delay: 3, arr_sched: '07:10', arr_actual: '07:15', arr_delay: 5, avg_delay: 4 },
-          { operator: 'Italo', train_no: 'IT8902', route: 'RN-BO', dep_sched: '06:38', dep_actual: '06:50', dep_delay: 12, arr_sched: '07:33', arr_actual: '07:47', arr_delay: 14, avg_delay: 13 },
-          { operator: 'Frecciarossa', train_no: 'FR8810', route: 'RN-BO', dep_sched: '07:20', dep_actual: '07:45', dep_delay: 25, arr_sched: '08:15', arr_actual: '08:43', arr_delay: 28, avg_delay: 26.5 },
-          { operator: 'Frecciarossa', train_no: 'FR9806', route: 'BO-RN', dep_sched: '16:35', dep_actual: '16:37', dep_delay: 2, arr_sched: '17:30', arr_actual: '17:31', arr_delay: 1, avg_delay: 1.5 },
-          { operator: 'Italo', train_no: 'IT8920', route: 'BO-RN', dep_sched: '18:15', dep_actual: '18:30', dep_delay: 15, arr_sched: '19:10', arr_actual: '19:28', arr_delay: 18, avg_delay: 16.5 }
-        ]
-      };
-    }
+        // Inizializza Panoramica e Grafici
+        function initOverview() {
+            let allTrains = [];
+            let dates = Object.keys(globalData).sort();
+            
+            dates.forEach(d => {
+                if (Array.isArray(globalData[d])) {
+                    allTrains = allTrains.concat(globalData[d]);
+                }
+            });
 
-    loadData();
-  </script>
+            document.getElementById('stat-total-trains').innerText = allTrains.length;
+
+            if (allTrains.length > 0) {
+                const avgDep = (allTrains.reduce((acc, t) => acc + t.dep_delay, 0) / allTrains.length).toFixed(1);
+                const avgArr = (allTrains.reduce((acc, t) => acc + t.arr_delay, 0) / allTrains.length).toFixed(1);
+                document.getElementById('stat-avg-dep').innerText = avgDep + ' min';
+                document.getElementById('stat-avg-arr').innerText = avgArr + ' min';
+            }
+
+            // Grafico Linea (Ritardo medio per giorno)
+            const dailyAvgDelays = dates.map(d => {
+                const trains = globalData[d];
+                if (!trains.length) return 0;
+                const sum = trains.reduce((acc, t) => acc + t.avg_delay, 0);
+                return (sum / trains.length).toFixed(1);
+            });
+
+            const ctxDelay = document.getElementById('delayChart').getContext('2d');
+            if (delayChartInstance) delayChartInstance.destroy();
+            delayChartInstance = new Chart(ctxDelay, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Ritardo Medio (min)',
+                        data: dailyAvgDelays,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Grafico Torta/Barre (Operatori)
+            let frecciarossaCount = 0;
+            let italoCount = 0;
+            allTrains.forEach(t => {
+                if (t.operator === 'Italo') italoCount++;
+                else frecciarossaCount++;
+            });
+
+            const ctxOp = document.getElementById('operatorChart').getContext('2d');
+            if (operatorChartInstance) operatorChartInstance.destroy();
+            operatorChartInstance = new Chart(ctxOp, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Frecciarossa', 'Italo'],
+                    datasets: [{
+                        data: [frecciarossaCount, italoCount],
+                        backgroundColor: ['#dc2626', '#db2777']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Mostra dati giornalieri filtrati per data scelta
+        function renderDailyData() {
+            const selectedDate = document.getElementById('datePicker').value;
+            const tbody = document.getElementById('daily-table-body');
+            tbody.innerHTML = '';
+
+            const trains = globalData[selectedDate] || [];
+
+            if (trains.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-400">Nessun treno registrato per la data selezionata.</td></tr>`;
+                return;
+            }
+
+            trains.forEach(t => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-50 transition";
+                row.innerHTML = `
+                    <td class="p-3 font-semibold ${t.operator === 'Italo' ? 'text-pink-600' : 'text-red-600'}">${t.operator}</td>
+                    <td class="p-3 font-mono">${t.train_no}</td>
+                    <td class="p-3"><span class="px-2 py-1 bg-gray-100 rounded text-xs font-medium">${t.route}</span></td>
+                    <td class="p-3">${t.dep_sched} <span class="text-xs text-gray-400">(${t.dep_actual})</span></td>
+                    <td class="p-3"><span class="px-2 py-1 rounded text-xs ${t.dep_delay > 0 ? 'bg-red-100 text-red-700 font-bold' : 'bg-green-100 text-green-700'}">+${t.dep_delay}m</span></td>
+                    <td class="p-3">${t.arr_sched} <span class="text-xs text-gray-400">(${t.arr_actual})</span></td>
+                    <td class="p-3"><span class="px-2 py-1 rounded text-xs ${t.arr_delay > 0 ? 'bg-red-100 text-red-700 font-bold' : 'bg-green-100 text-green-700'}">+${t.arr_delay}m</span></td>
+                    <td class="p-3 font-bold">${t.avg_delay}m</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Statistiche per periodo personalizzato
+        function calculatePeriodStats() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            if (!start || !end) {
+                alert("Seleziona sia la data di inizio che quella di fine.");
+                return;
+            }
+
+            let periodTrains = [];
+            Object.keys(globalData).forEach(d => {
+                if (d >= start && d <= end && Array.isArray(globalData[d])) {
+                    periodTrains = periodTrains.concat(globalData[d]);
+                }
+            });
+
+            document.getElementById('period-results').classList.remove('hidden');
+            document.getElementById('period-total').innerText = periodTrains.length;
+
+            if (periodTrains.length > 0) {
+                const avgDep = (periodTrains.reduce((acc, t) => acc + t.dep_delay, 0) / periodTrains.length).toFixed(1);
+                const avgArr = (periodTrains.reduce((acc, t) => acc + t.arr_delay, 0) / periodTrains.length).toFixed(1);
+                document.getElementById('period-dep').innerText = avgDep + ' min';
+                document.getElementById('period-arr').innerText = avgArr + ' min';
+            } else {
+                document.getElementById('period-dep').innerText = '0 min';
+                document.getElementById('period-arr').innerText = '0 min';
+            }
+        }
+
+        // Avvio caricamento all'apertura
+        loadData();
+    </script>
 </body>
 </html>
