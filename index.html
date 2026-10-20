@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrainDelay Lab - Rimini ↔ Bologna</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); }
+  </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center glass-card p-6 rounded-2xl gap-4">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-3 text-white">
+          <i class="fa-solid fa-train text-amber-500"></i> TrainDelay Lab
+          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-normal">Live Tracking</span>
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">Tratte Dirette: Rimini ↔ Bologna C.le (Frecciarossa & Italo)</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="triggerGitHubWorkflow()" class="bg-amber-600 hover:bg-amber-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2 shadow-lg">
+          <i class="fa-solid fa-rotate"></i> Aggiorna Dati Ora
+        </button>
+        <label for="date-select" class="text-xs text-slate-400 ml-2">Data:</label>
+        <input type="date" id="date-select" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500">
+      </div>
+    </div>
+
+    <!-- FILTRI TRATTA, OPERATORE & TRENO -->
+    <div class="glass-card p-4 rounded-xl flex flex-wrap items-center gap-4 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="text-slate-400 font-medium">Tratta:</span>
+        <select id="filter-route" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5">
+          <option value="ALL">Tutte le Tratte</option>
+          <option value="RN-BO">Mattina: Rimini → Bologna (06:00 - 09:00)</option>
+          <option value="BO-RN">Sera: Bologna → Rimini (16:00 - 21:00)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-slate-400 font-medium">Operatore:</span>
+        <select id="filter-operator" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5">
+          <option value="ALL">Tutti</option>
+          <option value="Frecciarossa">Frecciarossa</option>
+          <option value="Italo">Italo</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-amber-400 font-medium"><i class="fa-solid fa-filter"></i> Singolo Treno:</span>
+        <select id="filter-train" class="bg-slate-800 border border-amber-500/50 text-amber-200 rounded-lg px-3 py-1.5 font-semibold">
+          <option value="ALL">-- Tutti i Treni --</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- COCKPIT KPI -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-amber-500">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Ritardo Medio Oggi</p>
+          <h2 id="kpi-avg-delay" class="text-3xl font-bold mt-1 text-white">-- min</h2>
+          <p id="kpi-operator-split" class="text-xs text-slate-400 mt-2">FR: -- | Italo: --</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+      </div>
+
+      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-emerald-500">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Indice Puntualità</p>
+          <h2 id="kpi-punctuality" class="text-3xl font-bold mt-1 text-emerald-400">--%</h2>
+          <p class="text-xs text-slate-400 mt-2">Treni con ritardo ≤ 5 min</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+
+      <div class="glass-card p-6 rounded-2xl flex justify-between items-center border-l-4 border-l-rose-500">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Peggiore Ritardo Oggi</p>
+          <h2 id="kpi-max-delay" class="text-3xl font-bold mt-1 text-rose-400">-- min</h2>
+          <p id="kpi-worst-train" class="text-xs text-slate-400 mt-2">Treno: --</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRAFICI -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="glass-card p-6 rounded-2xl">
+        <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-chart-pie text-amber-400 mr-2"></i>Distribuzione Puntualità</h3>
+        <div class="h-64"><canvas id="chart-status"></canvas></div>
+      </div>
+      <div class="glass-card p-6 rounded-2xl">
+        <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-chart-line text-amber-400 mr-2"></i>Trend Storico Ritardo Medio</h3>
+        <div class="h-64"><canvas id="chart-trend"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TABELLA TRENI -->
+    <div class="glass-card p-6 rounded-2xl overflow-hidden">
+      <h3 class="text-base font-semibold text-white mb-4 flex items-center justify-between">
+        <span><i class="fa-solid fa-list text-amber-400 mr-2"></i>Dettaglio Rilevazioni Corse</span>
+        <span id="train-count" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">0 Treni</span>
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-700 text-xs uppercase text-slate-400 font-semibold bg-slate-800/40">
+              <th class="p-3">Operatore</th>
+              <th class="p-3">N. Treno</th>
+              <th class="p-3">Tratta</th>
+              <th class="p-3">Sched.</th>
+              <th class="p-3">Effettivo</th>
+              <th class="p-3">Ritardo</th>
+              <th class="p-3">Stato</th>
+            </tr>
+          </thead>
+          <tbody id="train-table-body" class="divide-y divide-slate-800 text-sm">
+            <!-- Popolato via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let dbData = {};
+    let statusChart = null;
+    let trendChart = null;
+
+    async function loadData() {
+      try {
+        const res = await fetch('history.json?t=' + Date.now());
+        if (res.ok) {
+          dbData = await res.json();
+        } else {
+          dbData = getFallbackData();
+        }
+      } catch (e) {
+        dbData = getFallbackData();
+      }
+      initApp();
+    }
+
+    async function triggerGitHubWorkflow() {
+      const token = prompt("Inserisci il tuo GitHub Personal Access Token (conpermessi 'repo' o 'workflow') per avviare l'aggiornamento live:");
+      if (!token) return;
+
+      // Sostituisci con il nome utente e repository corretti su GitHub
+      const owner = "mbertei";
+      const repo = "RiminiRiminiRimini";
+
+      alert("Invio richiesta di aggiornamento a GitHub... L'operazione richiederà circa 30 secondi prima che i dati siano visibili ricaricando la pagina.");
+
+      try {
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/tracker.yml/dispatches`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ref: 'main' })
+        });
+
+        if (response.ok) {
+          alert("Aggiornamento avviato con successo su GitHub! Attendi 30 secondi e ricarica la pagina.");
+        } else {
+          const errText = await response.text();
+          alert("Errore nell'avvio dell'azione: " + response.status + " - " + errText);
+        }
+      } catch (e) {
+        alert("Errore di rete durante la chiamata API: " + e.message);
+      }
+    }
+
+    function initApp() {
+      const dates = Object.keys(dbData).sort().reverse();
+      const dateSelect = document.getElementById('date-select');
+      dateSelect.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+      
+      if (dates.length > 0) {
+        dateSelect.value = dates[0];
+      }
+
+      populateTrainDropdown();
+      updateDashboard();
+
+      document.getElementById('date-select').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
+      document.getElementById('filter-route').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
+      document.getElementById('filter-operator').addEventListener('change', () => { populateTrainDropdown(); updateDashboard(); });
+      document.getElementById('filter-train').addEventListener('change', updateDashboard);
+    }
+
+    function getSelectedDateTrains() {
+      const selectedDate = document.getElementById('date-select').value;
+      const routeFilter = document.getElementById('filter-route').value;
+      const opFilter = document.getElementById('filter-operator').value;
+      const trainFilter = document.getElementById('filter-train').value;
+
+      let trains = dbData[selectedDate] || [];
+
+      if (routeFilter !== 'ALL') trains = trains.filter(t => t.route === routeFilter);
+      if (opFilter !== 'ALL') trains = trains.filter(t => t.operator === opFilter);
+      if (trainFilter !== 'ALL') trains = trains.filter(t => t.train_no === trainFilter);
+
+      return trains;
+    }
+
+    function populateTrainDropdown() {
+      const selectedDate = document.getElementById('date-select').value;
+      const routeFilter = document.getElementById('filter-route').value;
+      const opFilter = document.getElementById('filter-operator').value;
+      const trainSelect = document.getElementById('filter-train');
+
+      let trains = dbData[selectedDate] || [];
+      if (routeFilter !== 'ALL') trains = trains.filter(t => t.route === routeFilter);
+      if (opFilter !== 'ALL') trains = trains.filter(t => t.operator === opFilter);
+
+      const currentVal = trainSelect.value;
+      trainSelect.innerHTML = '<option value="ALL">-- Tutti i Treni --</option>';
+
+      const uniqueTrains = Array.from(new Set(trains.map(t => `${t.train_no}|${t.time_sched}`)));
+      uniqueTrains.sort().forEach(item => {
+        const [no, time] = item.split('|');
+        trainSelect.innerHTML += `<option value="${no}">${no} (${time})</option>`;
+      });
+
+      if (uniqueTrains.some(item => item.startsWith(currentVal))) {
+        trainSelect.value = currentVal;
+      }
+    }
+
+    function updateDashboard() {
+      const trains = getSelectedDateTrains();
+      document.getElementById('train-count').textContent = `${trains.length} Treni`;
+
+      if (trains.length === 0) {
+        document.getElementById('kpi-avg-delay').textContent = '-- min';
+        document.getElementById('kpi-punctuality').textContent = '--%';
+        document.getElementById('kpi-max-delay').textContent = '-- min';
+        document.getElementById('kpi-worst-train').textContent = 'Nessun dato';
+      } else {
+        const delays = trains.map(t => t.delay);
+        const avgDelay = (delays.reduce((a, b) => a + b, 0) / delays.length).toFixed(1);
+        const onTime = trains.filter(t => t.delay <= 5).length;
+        const punctuality = Math.round((onTime / trains.length) * 100);
+        const maxDelay = Math.max(...delays);
+        const worstTrain = trains.find(t => t.delay === maxDelay);
+
+        const frTrains = trains.filter(t => t.operator === 'Frecciarossa');
+        const italoTrains = trains.filter(t => t.operator === 'Italo');
+        const frAvg = frTrains.length ? (frTrains.reduce((a,b)=>a+b.delay,0)/frTrains.length).toFixed(1) : '--';
+        const itAvg = italoTrains.length ? (italoTrains.reduce((a,b)=>a+b.delay,0)/italoTrains.length).toFixed(1) : '--';
+
+        document.getElementById('kpi-avg-delay').textContent = `${avgDelay} min`;
+        document.getElementById('kpi-operator-split').textContent = `FR: ${frAvg}m | Italo: ${itAvg}m`;
+        document.getElementById('kpi-punctuality').textContent = `${punctuality}%`;
+        document.getElementById('kpi-max-delay').textContent = `+${maxDelay} min`;
+        document.getElementById('kpi-worst-train').textContent = worstTrain ? `${worstTrain.train_no} (${worstTrain.route})` : '--';
+      }
+
+      renderTable(trains);
+      renderCharts(trains);
+    }
+
+    function renderTable(trains) {
+      const tbody = document.getElementById('train-table-body');
+      tbody.innerHTML = '';
+
+      trains.forEach(t => {
+        const badgeColor = t.delay <= 5 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                           t.delay <= 15 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                           'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+        const opBadge = t.operator === 'Frecciarossa' ? 'bg-red-600/20 text-red-400 border-red-500/30' : 'bg-rose-900/30 text-rose-300 border-rose-700/30';
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-800/50 transition">
+            <td class="p-3"><span class="px-2 py-0.5 text-xs rounded border ${opBadge}">${t.operator}</span></td>
+            <td class="p-3 font-semibold text-white">${t.train_no}</td>
+            <td class="p-3 text-slate-300">${t.route === 'RN-BO' ? 'Rimini → Bologna' : 'Bologna → Rimini'}</td>
+            <td class="p-3 text-slate-400">${t.time_sched}</td>
+            <td class="p-3 text-slate-200">${t.time_actual}</td>
+            <td class="p-3 font-bold ${t.delay > 5 ? 'text-amber-400' : 'text-emerald-400'}">+${t.delay} min</td>
+            <td class="p-3"><span class="px-2.5 py-1 text-xs rounded-full border ${badgeColor}">${t.delay <= 5 ? 'In orario' : 'In ritardo'}</span></td>
+          </tr>
+        `;
+      });
+    }
+
+    function renderCharts(trains) {
+      const statusCounts = [
+        trains.filter(t => t.delay <= 5).length,
+        trains.filter(t => t.delay > 5 && t.delay <= 15).length,
+        trains.filter(t => t.delay > 15).length
+      ];
+
+      if (statusChart) statusChart.destroy();
+      const ctxStatus = document.getElementById('chart-status').getContext('2d');
+      statusChart = new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+          labels: ['In Orario (≤5m)', 'Ritardo Lieve (6-15m)', 'Ritardo Forte (>15m)'],
+          datasets: [{
+            data: statusCounts,
+            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
+            borderWidth: 0
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+      });
+
+      const dates = Object.keys(dbData).sort();
+      const trainFilter = document.getElementById('filter-train').value;
+      const trendData = dates.map(d => {
+        let dayTrains = dbData[d] || [];
+        if (trainFilter !== 'ALL') dayTrains = dayTrains.filter(t => t.train_no === trainFilter);
+        if (dayTrains.length === 0) return 0;
+        return (dayTrains.reduce((a, b) => a + b.delay, 0) / dayTrains.length).toFixed(1);
+      });
+
+      if (trendChart) trendChart.destroy();
+      const ctxTrend = document.getElementById('chart-trend').getContext('2d');
+      trendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'Ritardo Medio (min)',
+            data: trendData,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          },
+          plugins: { legend: { labels: { color: '#94a3b8' } } }
+        }
+      });
+    }
+
+    function getFallbackData() {
+      const today = new Date().toISOString().split('T')[0];
+      return {
+        [today]: [
+          { operator: 'Frecciarossa', train_no: 'FR9802', route: 'RN-BO', time_sched: '06:15', time_actual: '06:18', delay: 3 },
+          { operator: 'Italo', train_no: 'IT8902', route: 'RN-BO', time_sched: '06:38', time_actual: '06:50', delay: 12 },
+          { operator: 'Frecciarossa', train_no: 'FR8810', route: 'RN-BO', time_sched: '07:20', time_actual: '07:45', delay: 25 },
+          { operator: 'Frecciarossa', train_no: 'FR9806', route: 'BO-RN', time_sched: '16:35', time_actual: '16:37', delay: 2 },
+          { operator: 'Italo', train_no: 'IT8920', route: 'BO-RN', time_sched: '18:15', time_actual: '18:30', delay: 15 }
+        ]
+      };
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
