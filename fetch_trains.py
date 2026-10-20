@@ -2,8 +2,6 @@ import json
 import urllib.request
 from datetime import datetime
 
-# S06000 = Rimini, S05000 = Bologna Centrale
-
 def get_station_trains(station_id):
     url = f"http://www.viaggiatreno.it/infomobilitamobile/api/m/partenze?stazione={station_id}"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -35,10 +33,11 @@ def process_trains():
     if today_str not in history:
         history[today_str] = []
 
-    existing_keys = {f"{t['train_no']}_{t['route']}" for t in history[today_str]}
+    # Creiamo una chiave unica basata su numero treno e orario schedulato per evitare doppioni
+    existing_keys = {f"{t['train_no']}_{t['dep_sched']}_{t['route']}" for t in history[today_str]}
     new_records = []
 
-    # 1. Mattina Rimini -> Bologna
+    # 1. Scansione Rimini -> Bologna (Tutti i treni diretti trovati)
     rn_data = get_station_trains("S06000")
     for train in rn_data:
         comp = train.get("compTipologiaTreno", [""])[0]
@@ -47,20 +46,18 @@ def process_trains():
         
         if "FR" in category or "AV" in category or "Italo" in comp or category == "FR":
             dep_sched = train.get("orarioPartenza", "")
-            if "06:00" <= dep_sched <= "09:00":
+            if dep_sched:
                 op = "Italo" if ("ITALO" in comp.upper() or "NTV" in comp.upper()) else "Frecciarossa"
                 train_no = f"IT{num}" if op == "Italo" else f"FR{num}"
-                key = f"{train_no}_RN-BO"
+                key = f"{train_no}_{dep_sched}_RN-BO"
                 
                 if key not in existing_keys:
                     dep_delay = max(0, int(train.get("ritardo", 0)))
                     dep_actual = train.get("orarioEffettivo", add_minutes_to_time(dep_sched, dep_delay))
                     
-                    # Stima orario e ritardo arrivo (durata media 55m)
                     arr_sched = add_minutes_to_time(dep_sched, 55)
-                    arr_delay = dep_delay  # stima
+                    arr_delay = dep_delay
                     arr_actual = add_minutes_to_time(arr_sched, arr_delay)
-                    
                     avg_delay = round((dep_delay + arr_delay) / 2.0, 1)
 
                     new_records.append({
@@ -75,8 +72,9 @@ def process_trains():
                         "arr_delay": arr_delay,
                         "avg_delay": avg_delay
                     })
+                    existing_keys.add(key)
 
-    # 2. Sera Bologna -> Rimini
+    # 2. Scansione Bologna -> Rimini (Tutti i treni diretti trovati)
     bo_data = get_station_trains("S05000")
     for train in bo_data:
         comp = train.get("compTipologiaTreno", [""])[0]
@@ -85,10 +83,10 @@ def process_trains():
 
         if "FR" in category or "AV" in category or "Italo" in comp or category == "FR":
             dep_sched = train.get("orarioPartenza", "")
-            if "16:00" <= dep_sched <= "21:00":
+            if dep_sched:
                 op = "Italo" if ("ITALO" in comp.upper() or "NTV" in comp.upper()) else "Frecciarossa"
                 train_no = f"IT{num}" if op == "Italo" else f"FR{num}"
-                key = f"{train_no}_BO-RN"
+                key = f"{train_no}_{dep_sched}_BO-RN"
                 
                 if key not in existing_keys:
                     dep_delay = max(0, int(train.get("ritardo", 0)))
@@ -97,7 +95,6 @@ def process_trains():
                     arr_sched = add_minutes_to_time(dep_sched, 55)
                     arr_delay = dep_delay
                     arr_actual = add_minutes_to_time(arr_sched, arr_delay)
-                    
                     avg_delay = round((dep_delay + arr_delay) / 2.0, 1)
 
                     new_records.append({
@@ -112,6 +109,7 @@ def process_trains():
                         "arr_delay": arr_delay,
                         "avg_delay": avg_delay
                     })
+                    existing_keys.add(key)
 
     history[today_str].extend(new_records)
 
