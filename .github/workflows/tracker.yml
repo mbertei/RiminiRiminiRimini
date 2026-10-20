@@ -1,0 +1,34 @@
+name: Daily Train Delay Tracker
+
+on:
+  schedule:
+    # Esegue automaticamente ogni giorno alle 09:15 e 21:15 UTC
+    - cron: '15 7 * * *'
+    - cron: '15 19 * * *'
+  workflow_dispatch: # Permette anche di avviarlo manualmente da GitHub UI
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/python-version@v4
+        with:
+          python-version: '3.x'
+
+      - name: Esegui rilevazione treni
+        run: python fetch_trains.py
+
+      - name: Commit e Push dei nuovi dati su GitHub
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add history.json
+          git commit -m "Automated update train delay data [skip ci]" || exit 0
+          git push
